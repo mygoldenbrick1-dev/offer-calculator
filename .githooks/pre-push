@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+
+echo "Running full secret scan before push..."
+node scripts/scan-secrets.mjs --all
+status=$?
+
+if [ $status -ne 0 ]; then
+  echo "Push blocked by secret scan."
+  exit $status
+fi
+
+exit 0

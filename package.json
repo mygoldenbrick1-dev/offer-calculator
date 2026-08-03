@@ -1,0 +1,21 @@
+{
+  "name": "offer-calculator-sandbox",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "scan:secrets": "node scripts/scan-secrets.mjs --staged",
+    "scan:secrets:all": "node scripts/scan-secrets.mjs --all"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.0"
+  }
+}
