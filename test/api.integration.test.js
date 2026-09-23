@@ -4,7 +4,10 @@ import { createServer } from "vite";
 
 import { createRateLimiter, localApi } from "../vite.config.js";
 
-const credentials = { HOUSECANARY_API_KEY: "test-key", HOUSECANARY_API_SECRET: "test-secret" };
+const credentials = {
+  HOUSECANARY_API_KEY: process.env.HOUSECANARY_API_KEY || `integration-${process.pid}`,
+  HOUSECANARY_API_SECRET: process.env.HOUSECANARY_API_SECRET || `integration-${process.pid}`,
+};
 
 function providerResponse(url, calls) {
   calls.push(url.pathname);
