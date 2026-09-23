@@ -6,15 +6,20 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "node --test",
+    "test:api": "node --test test/api.integration.test.js",
+    "test:e2e": "playwright test",
     "preview": "vite preview",
     "scan:secrets": "node scripts/scan-secrets.mjs --staged",
     "scan:secrets:all": "node scripts/scan-secrets.mjs --all"
   },
   "dependencies": {
+    "jspdf": "^4.2.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@vitejs/plugin-react": "^4.3.1",
     "vite": "^5.4.0"
   }

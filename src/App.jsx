@@ -1,13 +1,21 @@
+import { useState } from "react";
+import AnchorPriceReport from "./AnchorPriceReport.jsx";
 import OfferCalculator from "./OfferCalculator.jsx";
+import { saveDeal } from "./dealStorage.js";
 
 export default function App() {
+  const [view, setView] = useState("calculator");
+
   return (
-    <OfferCalculator
-      onExport={(summary) => {
-        // Sprint 1 smoke test: confirm addressVerified/coords come through
-        // once the Census geocoder match is selected in the browser.
-        console.log("Deal summary exported:", summary);
-      }}
-    />
+    <div className="workspace-shell">
+      <nav className="workspace-nav" aria-label="Workspace">
+        <strong>Stone Street Revive</strong>
+        <div>
+          <button className={view === "calculator" ? "active" : ""} onClick={() => setView("calculator")}>Offer Calculator</button>
+          <button className={view === "anchor" ? "active" : ""} onClick={() => setView("anchor")}>Anchor Report</button>
+        </div>
+      </nav>
+      {view === "calculator" ? <OfferCalculator onSave={saveDeal} /> : <AnchorPriceReport />}
+    </div>
   );
 }
