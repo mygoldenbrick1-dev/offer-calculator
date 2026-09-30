@@ -5,6 +5,12 @@ import { saveDeal } from "./dealStorage.js";
 
 export default function App() {
   const [view, setView] = useState("calculator");
+  const [anchorContext, setAnchorContext] = useState(null);
+
+  function useAnchorComps(context) {
+    setAnchorContext(context);
+    setView("calculator");
+  }
 
   return (
     <div className="workspace-shell">
@@ -15,7 +21,16 @@ export default function App() {
           <button className={view === "anchor" ? "active" : ""} onClick={() => setView("anchor")}>Anchor Report</button>
         </div>
       </nav>
-      {view === "calculator" ? <OfferCalculator onSave={saveDeal} /> : <AnchorPriceReport />}
+      {view === "calculator" ? <OfferCalculator property={anchorContext?.subject ? {
+        address: anchorContext.subject.address,
+        meta: `${anchorContext.subject.beds ?? "-"} bed · ${anchorContext.subject.baths ?? "-"} bath · ${anchorContext.subject.sqft ?? "-"} sqft`,
+        arv: anchorContext.averagePricePerSqft && anchorContext.subject.sqft
+          ? Math.round(anchorContext.averagePricePerSqft * anchorContext.subject.sqft)
+          : undefined,
+        sqft: anchorContext.subject.sqft,
+        anchorComps: anchorContext.comps,
+        anchorAveragePricePerSqft: anchorContext.averagePricePerSqft,
+      } : {}} onSave={saveDeal} /> : <AnchorPriceReport onUseComps={useAnchorComps} />}
     </div>
   );
 }

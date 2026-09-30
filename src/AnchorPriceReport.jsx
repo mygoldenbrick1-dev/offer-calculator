@@ -16,7 +16,7 @@ const date = (value) => value
   ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(`${value}T12:00:00`))
   : "-";
 
-export default function AnchorPriceReport() {
+export default function AnchorPriceReport({ onUseComps }) {
   const addressId = useId();
   const [address, setAddress] = useState("");
   const [report, setReport] = useState(null);
@@ -25,6 +25,7 @@ export default function AnchorPriceReport() {
   const [error, setError] = useState("");
   const [view, setView] = useState("analysis");
   const [downloading, setDownloading] = useState(false);
+  const [selectedCompIds, setSelectedCompIds] = useState(new Set());
   const requestRef = useRef(null);
 
   useEffect(() => () => requestRef.current?.abort(), []);
@@ -39,6 +40,7 @@ export default function AnchorPriceReport() {
     try {
       const nextReport = await getHouseCanaryComps(address, controller.signal);
       setReport(nextReport);
+      setSelectedCompIds(new Set());
       const reportDate = nextReport.effectiveDate ? new Date(nextReport.effectiveDate) : new Date();
       setFilters(initialCompFilters(nextReport.comps, nextReport.subject, DEFAULT_FILTERS, reportDate));
       setStatus("ready");
@@ -58,6 +60,8 @@ export default function AnchorPriceReport() {
       .filter((comp) => filters.condition === "all" || comp.condition === filters.condition)
     : [];
   const summary = anchorSummary(filteredComps);
+  const selectedComps = filteredComps.filter((comp) => selectedCompIds.has(comp.id));
+  const selectedSummary = anchorSummary(selectedComps);
   const conditions = report ? [...new Set(report.comps.map((comp) => comp.condition))].sort() : [];
 
   async function exportPdf() {
@@ -167,11 +171,38 @@ export default function AnchorPriceReport() {
           <section className="anchor-comps">
             <div className="anchor-section-heading">
               <div><p className="anchor-kicker">Comparable sales</p><h2>Evidence behind the price</h2></div>
-              <span>{filteredComps.length} shown</span>
+              <span>{selectedComps.length} selected / {filteredComps.length} shown</span>
             </div>
+            {filteredComps.length > 0 && (
+              <div className="anchor-selection-bar">
+                <span>Selected average: {money(selectedSummary.averagePricePerSqft)}/sqft</span>
+                <button
+                  type="button"
+                  disabled={!selectedComps.length}
+                  onClick={() => onUseComps?.({
+                    subject: report.subject,
+                    comps: selectedComps,
+                    averagePricePerSqft: selectedSummary.averagePricePerSqft,
+                  })}
+                >Use selected comps in calculator</button>
+              </div>
+            )}
             {!filteredComps.length && <p className="anchor-no-results">No closed sales match these filters. Widen the radius or sale date.</p>}
             {filteredComps.map((comp) => (
               <article className="anchor-comp" key={comp.id}>
+                <label className="anchor-comp-select">
+                  <input
+                    type="checkbox"
+                    checked={selectedCompIds.has(comp.id)}
+                    onChange={(event) => setSelectedCompIds((current) => {
+                      const next = new Set(current);
+                      if (event.target.checked) next.add(comp.id); else next.delete(comp.id);
+                      return next;
+                    })}
+                    aria-label={`Select ${comp.address}`}
+                  />
+                  <span>Select</span>
+                </label>
                 <div className="anchor-comp-address"><h3>{comp.address}</h3><p>{date(comp.saleDate)} · {number(comp.distance, 2)} mi away</p></div>
                 <div className="anchor-comp-price"><strong>{money(comp.salePrice)}</strong><span>{money(comp.pricePerSqft)}/sqft</span></div>
                 <dl>

@@ -149,6 +149,11 @@ const ADJUSTMENT_PRESETS = [
 
 const DEFAULT_ADJUSTMENT_RATES = { rooms: 10, windows: 10, roof: 10, paint: 10 };
 const ADJUSTMENT_RATES_KEY = "offer-calculator.adjustment-rates";
+const PHOTO_SLOTS = [
+  { key: "before", label: "Before", description: "Existing condition" },
+  { key: "current", label: "Current", description: "Work in progress" },
+  { key: "after", label: "After", description: "Completed condition" },
+];
 
 function loadAdjustmentRates() {
   try {
@@ -236,7 +241,7 @@ export default function OfferCalculator({ property = {}, onSave }) {
   const [joshFlipperProfit, setJoshFlipperProfit] = useState(40000);
   const [adjustments, setAdjustments] = useState([]);
   const [adjustmentRates, setAdjustmentRates] = useState(loadAdjustmentRates);
-  const [propertySqft, setPropertySqft] = useState(0);
+  const [propertySqft, setPropertySqft] = useState(property.sqft || 0);
   const [showAdjustmentSettings, setShowAdjustmentSettings] = useState(false);
   const [offerOverride, setOfferOverride] = useState(null);
   const [activeTab, setActiveTab] = useState("calculator"); // "calculator" | "breakdown"
@@ -245,6 +250,13 @@ export default function OfferCalculator({ property = {}, onSave }) {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [pdfStatus, setPdfStatus] = useState("idle");
+  const [photos, setPhotos] = useState({ before: [], current: [], after: [] });
+  const anchorAveragePricePerSqft = Number.isFinite(property.anchorAveragePricePerSqft)
+    ? property.anchorAveragePricePerSqft
+    : null;
+  const anchorIndicatedValue = anchorAveragePricePerSqft && propertySqft
+    ? anchorAveragePricePerSqft * propertySqft
+    : null;
 
   // Sync prop changes (e.g. ARV wired in from Module 2/3)
   useEffect(() => {
@@ -252,8 +264,9 @@ export default function OfferCalculator({ property = {}, onSave }) {
     if (property.purchasePrice) setPurchasePrice(property.purchasePrice);
     if (property.address) setAddress(property.address);
     if (property.meta) setMeta(property.meta);
+    if (property.sqft) setPropertySqft(property.sqft);
     if (property.coords) { setCoords(property.coords); setAddressVerified(true); }
-  }, [property.arv, property.purchasePrice, property.address, property.meta, property.coords]);
+  }, [property.arv, property.purchasePrice, property.address, property.meta, property.sqft, property.coords]);
 
   useEffect(() => {
     localStorage.setItem(ADJUSTMENT_RATES_KEY, JSON.stringify(adjustmentRates));
@@ -365,6 +378,34 @@ export default function OfferCalculator({ property = {}, onSave }) {
     }
   };
 
+  const addPhotos = (slot, fileList) => {
+    const imageFiles = [...fileList].filter((file) => file.type.startsWith("image/"));
+    if (!imageFiles.length) return;
+    setPhotos((current) => ({
+      ...current,
+      [slot]: [...current[slot], ...imageFiles].map((file) => ({
+        file,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        previewUrl: URL.createObjectURL(file),
+        uploadedAt: new Date().toISOString(),
+      })),
+    }));
+  };
+
+  const removePhoto = (slot, index) => {
+    setPhotos((current) => {
+      const photo = current[slot][index];
+      if (photo?.previewUrl) URL.revokeObjectURL(photo.previewUrl);
+      return { ...current, [slot]: current[slot].filter((_, photoIndex) => photoIndex !== index) };
+    });
+  };
+
+
+  useEffect(() => {
+    if (property.anchorComps?.length && address) loadPropertyInsights();
+  }, [property.anchorComps, address]);
   const buildSummary = useCallback(() => ({
       address,
       addressVerified,
@@ -392,8 +433,9 @@ export default function OfferCalculator({ property = {}, onSave }) {
       formulaStr,
       adjustments: pricedAdjustments,
       adjustmentRates,
+        photos: Object.fromEntries(Object.entries(photos).map(([slot, items]) => [slot, items.map(({ file, previewUrl, ...photo }) => photo)])),
       generatedAt: new Date().toISOString(),
-  }), [address, addressVerified, coords, meta, arv, purchasePrice, adjustedArv, totalAdjustments, rehabAdjustments, rehab, effectiveRehab, holdCost, closeCost, mode, marginPct, joshRehabBufferPct, joshPurchaseCosts, joshFlipperProfit, mao, targetProfit, offer, adjProfit, adjMarginPct, formulaStr, pricedAdjustments, adjustmentRates]);
+      }), [address, addressVerified, coords, meta, arv, purchasePrice, adjustedArv, totalAdjustments, rehabAdjustments, rehab, effectiveRehab, holdCost, closeCost, mode, marginPct, joshRehabBufferPct, joshPurchaseCosts, joshFlipperProfit, mao, targetProfit, offer, adjProfit, adjMarginPct, formulaStr, pricedAdjustments, adjustmentRates, photos]);
 
   const handleExport = useCallback(() => {
     const summary = buildSummary();
@@ -572,7 +614,61 @@ export default function OfferCalculator({ property = {}, onSave }) {
             </div>
           </div>
 
+          <div style={styles.sectionLabel}>Property Photos</div>
+          <div style={styles.card}>
+            <div style={styles.insightsTitle}>Condition documentation</div>
+            <div style={styles.insightsSubtitle}>Upload photos now. Condition review will be added later.</div>
+            <div className="photo-slot-grid">
+              {PHOTO_SLOTS.map((slot) => (
+                <div className="photo-slot" key={slot.key}>
+                  <div className="photo-slot-heading">
+                    <div>
+                      <strong>{slot.label}</strong>
+                      <span>{slot.description}</span>
+                    </div>
+                    <label className="photo-upload-button">
+                      Add photos
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        onChange={(event) => {
+                          addPhotos(slot.key, event.target.files);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {photos[slot.key].length ? (
+                    <div className="photo-preview-grid">
+                      {photos[slot.key].map((photo, index) => (
+                        <div className="photo-preview" key={`${photo.name}-${photo.uploadedAt}`}>
+                          <img src={photo.previewUrl} alt={`${slot.label} property photo ${index + 1}`} />
+                          <button type="button" onClick={() => removePhoto(slot.key, index)} aria-label={`Remove ${slot.label.toLowerCase()} photo ${index + 1}`}>Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="photo-empty">No photos added</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div style={styles.sectionLabel}>Property Insights</div>
+          {anchorAveragePricePerSqft && (
+            <div style={styles.card}>
+              <div style={styles.insightsTitle}>Selected anchor comps</div>
+              <div style={styles.insightsSubtitle}>
+                {property.anchorComps?.length || 0} selected comparable{property.anchorComps?.length === 1 ? "" : "s"}
+              </div>
+              <div className="anchor-calculator-metric">
+                <strong>{fmt(anchorAveragePricePerSqft)}/sqft</strong>
+                {anchorIndicatedValue && <span>Indicated value at {propertySqft.toLocaleString("en-US")} sqft: {fmt(anchorIndicatedValue)}</span>}
+              </div>
+            </div>
+          )}
           <div style={styles.card}>
             <div style={styles.insightsHeader}>
               <div>
