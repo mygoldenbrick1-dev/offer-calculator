@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer } from "vite";
 
+import { createAppServer } from "../server.js";
 import { createRateLimiter, localApi } from "../vite.config.js";
 
 const credentials = {
@@ -166,4 +170,25 @@ test("returns normalized comps and caches the Agile report", async (context) => 
   assert.equal(payload.comps[0].daysOnMarket, 18);
   assert.equal(payload.comps[0].pricePerSqft, 160);
   assert.equal(JSON.stringify(payload).includes("data_link"), false);
+});
+
+test("production server serves built files and API without Vite preview", async (context) => {
+  const distDir = await mkdtemp(join(tmpdir(), "offer-calculator-"));
+  context.after(() => rm(distDir, { recursive: true, force: true }));
+  await writeFile(join(distDir, "index.html"), "<h1>Offer Calculator</h1>");
+  const server = createAppServer({ distDir, env: {} });
+  context.after(() => new Promise((resolve) => server.close(resolve)));
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const home = await fetch(baseUrl);
+  assert.equal(home.status, 200);
+  assert.match(await home.text(), /Offer Calculator/);
+
+  const invalid = await fetch(`${baseUrl}/api/housecanary/value?address=x&zipcode=bad`);
+  assert.equal(invalid.status, 503);
+  assert.ok(invalid.headers.get("x-request-id"));
+
+  const missing = await fetch(`${baseUrl}/assets/missing.js`);
+  assert.equal(missing.status, 404);
 });

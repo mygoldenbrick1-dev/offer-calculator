@@ -82,3 +82,11 @@ API and browser tests mock upstream providers and do not consume HouseCanary poi
 5. Replace local storage `onSave` with the authenticated save mutation.
 6. Move the Vite development middleware behavior to production backend routes.
 7. Port the tests and run production integration tests before removing this sandbox.
+
+## Standalone AWS Deployment
+
+The sandbox can run on one Amazon Linux 2023 ARM EC2 instance using `server.js` to serve the built frontend and the existing API handlers. The bootstrap in `scripts/aws-user-data.sh` installs Node 22, downloads a private S3 build artifact, retrieves HouseCanary credentials from SSM SecureString, and starts `scripts/offer-calculator.service`. Build the frontend locally; do not include `.env` in the artifact.
+
+Current resources in account `117984642146`, region `us-east-2`: EC2 instance tagged `offer-calculator` (`t4g.nano`, encrypted 8 GiB gp3 root), security group `offer-calculator-single` (inbound TCP 80 only), instance profile `offer-calculator-ec2-profile`, private bucket `offer-calculator-deploy-117984642146-use2`, and SSM parameter `/offer-calculator/housecanary`. Use AWS Systems Manager for administration; SSH is not open.
+
+This minimal IP-only deployment uses HTTP and the public IP can change when the instance stops and starts. Add a domain and TLS before transmitting sensitive property information or treating it as a production deployment. Local-browser storage is not shared across devices or users. A single instance has no automatic failover, and Vite tooling dependencies remain installed for the API module import.
